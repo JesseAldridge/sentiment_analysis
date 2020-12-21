@@ -1,7 +1,7 @@
 import os, glob, time, pickle, csv, asyncio
 from datetime import datetime
 
-import twint
+import twint, aiohttp
 from nltk import tokenize
 
 import generate_classifier
@@ -54,9 +54,20 @@ def main():
         tweets_path = download_tweets(symbol, tweets_dir)
       except asyncio.exceptions.TimeoutError:
         print('timeout error')
+        continue
+      except aiohttp.client_exceptions.ClientConnectorError:
+        print('ClientConnectorError')
+        continue
+      except aiohttp.client_exceptions.ClientPayloadError:
+        print('ClientPayloadError')
+        continue
 
-      with open(tweets_path) as f:
-        tweet_rows = list(csv.DictReader(f))
+      try:
+        with open(tweets_path) as f:
+          tweet_rows = list(csv.DictReader(f))
+      except FileNotFoundError:
+        print('file not found:', tweets_path)
+        continue
       tweets = [Tweet(tweet_row.get('tweet')) for tweet_row in tweet_rows]
 
       sentiment = sum(tweet.sentiment for tweet in tweets) / len(tweets)
@@ -69,6 +80,7 @@ def main():
         for row in symbol_sentiment_rows:
           writer.writerow(row)
 
+    print('wrote to:', sentiment_path)
     print("{}, done, sleeping for 24 hours".format(datetime.utcnow()))
     time.sleep(60 * 60 * 24)
 
