@@ -1,10 +1,27 @@
-import os, glob, time, pickle, csv, asyncio
+import os, glob, time, pickle, csv, asyncio, logging, sys
 from datetime import datetime
 
 import twint, aiohttp
 from nltk import tokenize
 
 import generate_classifier
+
+def setup_logger():
+  logger = logging.getLogger()
+  logger.setLevel(logging.INFO)
+
+  fh = logging.FileHandler('my_log_info.log')
+  sh = logging.StreamHandler(sys.stdout)
+  formatter = logging.Formatter(
+    '[%(asctime)s] %(levelname)s [%(filename)s.%(funcName)s:%(lineno)d] %(message)s',
+    datefmt='%a, %d %b %Y %H:%M:%S'
+  )
+  fh.setFormatter(formatter)
+  sh.setFormatter(formatter)
+  logger.addHandler(fh)
+  logger.addHandler(sh)
+logger = setup_logger()
+
 
 def build_get_sentiment():
   with open("naivebayes.pickle", "rb") as f:
@@ -41,32 +58,34 @@ def main():
     tweets_dir = os.path.join(sentiment_dir, "tweets")
     if not os.path.exists(tweets_dir):
       os.makedirs(tweets_dir)
+    logging.info(f'downloading to dir: {sentiment_dir}')
 
     timestamp = '_'.join(str(datetime.utcnow()).split()).rsplit('.', 1)[0].replace(':', '-')
     sentiment_path = os.path.join(sentiment_dir, '{}'.format(timestamp)) + '.csv'
     symbol_sentiment_rows = []
 
-    for prices_path in glob.glob(os.path.expanduser('~/stock_data/*.csv'))[:LIMIT]:
+    csv_paths = glob.glob(os.path.expanduser('~/stock_data/YahooPrices/*.csv'))[:LIMIT]
+    for icsv, prices_path in enumerate(csv_paths):
       symbol = prices_path.rsplit('.csv', 1)[0].rsplit('/', 1)[1]
 
-      print('{}, grabbing tweets for: {}'.format(datetime.utcnow(), symbol))
+      logging.info(f'{icsv}/{len(csv_paths)}, grabbing tweets for: {symbol}')
       try:
         tweets_path = download_tweets(symbol, tweets_dir)
       except asyncio.exceptions.TimeoutError:
-        print('timeout error')
+        logging.info('timeout error')
         continue
       except aiohttp.client_exceptions.ClientConnectorError:
-        print('ClientConnectorError')
+        logging.info('ClientConnectorError')
         continue
       except aiohttp.client_exceptions.ClientPayloadError:
-        print('ClientPayloadError')
+        logging.info('ClientPayloadError')
         continue
 
       try:
         with open(tweets_path) as f:
           tweet_rows = list(csv.DictReader(f))
       except FileNotFoundError:
-        print('file not found:', tweets_path)
+        logging.info(f'file not found: {tweets_path}')
         continue
       tweets = [Tweet(tweet_row.get('tweet')) for tweet_row in tweet_rows]
 
@@ -80,8 +99,8 @@ def main():
         for row in symbol_sentiment_rows:
           writer.writerow(row)
 
-    print('wrote to:', sentiment_path)
-    print("{}, done, sleeping for 24 hours".format(datetime.utcnow()))
+      logging.info(f'wrote to: {sentiment_path}')
+    logging.info("done, sleeping for 24 hours")
     time.sleep(60 * 60 * 24)
 
 if __name__ == '__main__':
