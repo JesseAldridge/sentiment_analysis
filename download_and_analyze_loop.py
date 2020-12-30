@@ -68,7 +68,7 @@ def main():
       logging.info(f'{icsv}/{len(csv_paths)}, grabbing tweets for: {symbol}')
       try:
         tweets_path = download_tweets(symbol, tweets_dir)
-      except asyncio.exceptions.TimeoutError:
+      except asyncio.TimeoutError:
         logging.info('timeout error')
         continue
       except aiohttp.client_exceptions.ClientConnectorError:
