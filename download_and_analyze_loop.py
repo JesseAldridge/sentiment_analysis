@@ -77,6 +77,9 @@ def main():
       except aiohttp.client_exceptions.ClientPayloadError:
         logging.info('ClientPayloadError')
         continue
+      except twint.token.RefreshTokenException:
+        logging.info('RefreshTokenException')
+        continue
 
       try:
         with open(tweets_path) as f:
